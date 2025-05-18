@@ -36,12 +36,12 @@
 (def ^:private ancount (num->byte-pair 0)) ;; 0 answers
 (def ^:private nscount (num->byte-pair 0)) ;; 0 authority records
 (def ^:private arcount (num->byte-pair 0)) ;; 0 additional records
-(def ^:private host-address-qtype (num->byte-pair 1)) ;; A record type (host address)
-(def ^:private ns-qtype (num->byte-pair 2)) ;; NS record type (name server)
+(def host-address-qtype (num->byte-pair 1)) ;; A record type (host address)
+(def ns-qtype (num->byte-pair 2)) ;; NS record type (name server)
 (def ^:private qclass (num->byte-pair 1)) ;; IN class (Internet)
 (def ^:private max-label-references 16)
 
-(defn- random-id []
+(defn random-id []
   (num->byte-pair (rand-int max-value)))
 
 (defn- qname [dname]
@@ -132,25 +132,27 @@
      :authority authority
      :additional additional}))
 
-(defn query-server [{:keys [dname qtype] :or {dname "slack.com" qtype host-address-qtype}}]
+(defn dns-request [request]
   (with-open [socket (sock/->datagram-socket)]
-    (let [id (random-id)
-          header (concat id flags qdcount ancount nscount arcount)
-          question (concat (qname dname) qtype qclass)
-          name-server-address (addr/*get-by-name "1.1.1.1")
-          arr-req (byte-array (concat header question))
-          send-packet (packet/->datagram-packet arr-req (alength arr-req) name-server-address 53)
+    (let [name-server-address (addr/*get-by-name "1.1.1.1")
+          send-packet (packet/->datagram-packet (byte-array request) (count request) name-server-address 53)
           arr-ret (byte-array 4096)
           recv-packet (packet/->datagram-packet arr-ret (alength arr-ret))
           _ (sock/send socket send-packet)
-          _ (sock/receive socket recv-packet)
-          response (packet/get-data recv-packet)]
-      (if (= id (take 2 response))
-        (parse-response response)
-        (throw (ex-info "ID does not match response's ID" {:data response}))))))
+          _ (sock/receive socket recv-packet)]
+      (packet/get-data recv-packet))))
+
+(defn query-dns-server [{:keys [dname qtype] :or {dname "slack.com" qtype host-address-qtype}}]
+  (let [id (random-id)
+        header (concat id flags qdcount ancount nscount arcount)
+        question (concat (qname dname) qtype qclass)
+        response (dns-request (concat header question))]
+    (if (= id (take 2 response))
+      (parse-response response)
+      (throw (ex-info "ID does not match response's ID" {:data response})))))
 
 (defn -main [& opts]
-  (query-server opts))
+  (query-dns-server opts))
 
 (comment
   (-main :dname "example.com")

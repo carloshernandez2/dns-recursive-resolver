@@ -4,7 +4,9 @@
    [clojure.test.check.clojure-test :refer [defspec]]
    [clojure.test.check.generators :as gen]
    [clojure.test.check.properties :as prop]
-   [dns-client.main :as main]))
+   [mockfn.macros :as mfn]
+   [dns-client.main :as main]
+   [dns-client.aux.query-mocks :as query-mocks]))
 
 (defspec byte-pair-long 100
   (prop/for-all [num (gen/choose 0 main/max-value)]
@@ -33,3 +35,13 @@
 (deftest ip-labels-test
   (is (= [[[0x32 0x35 0x35] [0x32] [0x33] [0x34]] [0xC0 0x02 0x01 0x01 0x01]]
          (#'main/ip-labels [-0x01 0x02 0x03 0x04 0xC0 0x02 0x01 0x01 0x01]))))
+
+(deftest query-dns-server-test
+  (testing "Supports processing NS queries"
+    (mfn/providing [(main/dns-request query-mocks/ns-request) query-mocks/ns-response
+                    (main/random-id) query-mocks/random-id]
+                   (is (= query-mocks/ns-parsed-response (main/query-dns-server {:qtype main/ns-qtype})))))
+  (testing "Supports processing A queries"
+    (mfn/providing [(main/dns-request query-mocks/a-request) query-mocks/a-response
+                    (main/random-id) query-mocks/random-id]
+                   (is (= query-mocks/a-parsed-response (main/query-dns-server {:qtype main/host-address-qtype}))))))
