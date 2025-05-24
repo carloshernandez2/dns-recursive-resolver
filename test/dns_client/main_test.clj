@@ -44,4 +44,9 @@
   (testing "Supports processing A queries"
     (mfn/providing [(main/dns-request query-mocks/a-request) query-mocks/a-response
                     (main/random-id) query-mocks/random-id]
-                   (is (= query-mocks/a-parsed-response (main/query-dns-server {:qtype main/host-address-qtype}))))))
+                   (is (= query-mocks/a-parsed-response (main/query-dns-server {:qtype main/host-address-qtype})))))
+  (testing "Supports processing PTR queries"
+    (mfn/providing [(main/dns-request query-mocks/ptr-request) query-mocks/ptr-response
+                    (main/random-id) query-mocks/random-id]
+                   (is (= query-mocks/ptr-parsed-response (main/query-dns-server {:qtype main/ptr-qtype
+                                                                                  :dname "8.8.8.8.in-addr.arpa"}))))))

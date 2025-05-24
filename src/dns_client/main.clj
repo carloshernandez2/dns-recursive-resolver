@@ -1,9 +1,12 @@
 (ns dns-client.main
   (:gen-class)
-  (:require [clojure.string :as str]
-            [jdk.net.DatagramSocket :as sock]
-            [jdk.net.InetAddress :as addr]
-            [jdk.net.DatagramPacket :as packet]))
+  (:require
+   [clojure.edn :as edn]
+   [clojure.pprint :as pprint]
+   [clojure.string :as str]
+   [jdk.net.DatagramPacket :as packet]
+   [jdk.net.DatagramSocket :as sock]
+   [jdk.net.InetAddress :as addr]))
 
 (def max-value (Short/toUnsignedInt (short -1)))
 
@@ -37,7 +40,8 @@
 (def ^:private nscount (num->byte-pair 0)) ;; 0 authority records
 (def ^:private arcount (num->byte-pair 0)) ;; 0 additional records
 (def host-address-qtype (num->byte-pair 1)) ;; A record type (host address)
-(def ns-qtype (num->byte-pair 2)) ;; NS record type (name server)
+(def ns-qtype (num->byte-pair 2));; NS record type (name server)
+(def ptr-qtype (num->byte-pair 12)) ;; PTR record type (pointer to another domain name)
 (def ^:private qclass (num->byte-pair 1)) ;; IN class (Internet)
 (def ^:private max-label-references 16)
 
@@ -110,7 +114,8 @@
             [rdlen remaining] (split-at 2 remaining)
             [rdata-labels remaining] (case (byte-pair->num type)
                                        1 (ip-labels remaining)
-                                       2 (expand-labels remaining response))]
+                                       2 (expand-labels remaining response)
+                                       12 (expand-labels remaining response))]
         (recur (conj acc {:name (stringify-labels name-labels)
                           :type (byte-pair->num type)
                           :class (byte-pair->num class)
@@ -151,9 +156,12 @@
       (parse-response response)
       (throw (ex-info "ID does not match response's ID" {:data response})))))
 
-(defn -main [& opts]
-  (query-dns-server opts))
+(defn -main [opts]
+  (let [dns-response (query-dns-server (cond-> opts (string? opts) edn/read-string))]
+    (pprint/pprint dns-response)
+    dns-response))
 
 (comment
-  (-main :dname "example.com")
-  (-main :qtype ns-qtype))
+  (-main {:dname "example.com"})
+  (-main {:qtype ns-qtype})
+  (-main {:qtype ptr-qtype :dname "8.8.8.8.in-addr.arpa"}))
