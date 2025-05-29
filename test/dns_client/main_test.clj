@@ -16,13 +16,13 @@
 
 (deftest expand-labels-test
   (testing "Gets single label from a domain name and returns a list of remaining bytes"
-    (is (= [[[0x77 0x77 0x77]] [0x02 0x77 0x77 0x00]]
+    (is (= ["www" [0x02 0x77 0x77 0x00]]
            (main/expand-labels [0x03 0x77 0x77 0x77 0x00 0x02 0x77 0x77 0x00] []))))
   (testing "Splits a domain name into many labels"
-    (is (= [[[0x77 0x77 0x77] [0x77 0x77]] []]
+    (is (= ["www.ww" []]
            (main/expand-labels [3 119 119 119 2 119 119 0] []))))
   (testing "Correctly creates labels recursively via pointers"
-    (is (= [[[119 119 119] [119 119]] [0x01 0x01 0x01]]
+    (is (= ["www.ww" [0x01 0x01 0x01]]
            (main/expand-labels [0xC0 0x02 0x01 0x01 0x01]
                                [0x01 0x01 0x03 0x77 0x77 0x77 0xC0 0x0F
                                 0x01 0x01 0x01 0x03 0x77 0x77 0x77 0x02
@@ -33,20 +33,20 @@
                           (main/expand-labels [0xC0 0x00] [0xC0 0x00])))))
 
 (deftest ip-labels-test
-  (is (= [[[0x32 0x35 0x35] [0x32] [0x33] [0x34]] [0xC0 0x02 0x01 0x01 0x01]]
-         (#'main/ip-labels [-0x01 0x02 0x03 0x04 0xC0 0x02 0x01 0x01 0x01]))))
+  (is (= ["255.2.3.4" [0xC0 0x02 0x01 0x01 0x01]]
+         (#'main/ipv4-labels [-0x01 0x02 0x03 0x04 0xC0 0x02 0x01 0x01 0x01]))))
 
 (deftest query-dns-server-test
   (testing "Supports processing NS queries"
-    (mfn/providing [(main/dns-request query-mocks/ns-request) query-mocks/ns-response
+    (mfn/providing [(main/dns-request main/default-server query-mocks/ns-request) query-mocks/ns-response
                     (main/random-id) query-mocks/random-id]
                    (is (= query-mocks/ns-parsed-response (main/query-dns-server {:qtype main/ns-qtype})))))
   (testing "Supports processing A queries"
-    (mfn/providing [(main/dns-request query-mocks/a-request) query-mocks/a-response
+    (mfn/providing [(main/dns-request main/default-server query-mocks/a-request) query-mocks/a-response
                     (main/random-id) query-mocks/random-id]
                    (is (= query-mocks/a-parsed-response (main/query-dns-server {:qtype main/host-address-qtype})))))
   (testing "Supports processing PTR queries"
-    (mfn/providing [(main/dns-request query-mocks/ptr-request) query-mocks/ptr-response
+    (mfn/providing [(main/dns-request main/default-server query-mocks/ptr-request) query-mocks/ptr-response
                     (main/random-id) query-mocks/random-id]
                    (is (= query-mocks/ptr-parsed-response (main/query-dns-server {:qtype main/ptr-qtype
                                                                                   :dname "8.8.8.8.in-addr.arpa"}))))))
